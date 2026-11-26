@@ -24,6 +24,61 @@ const KIND: Record<DayKind, { icon: string; label: string }> = {
 };
 
 const STORAGE = "advent-opened";
+const CONTENT = "advent-content";
+
+function resizeImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const im = new Image();
+      im.onload = () => {
+        const scale = Math.min(1, 900 / Math.max(im.width, im.height));
+        const c = document.createElement("canvas");
+        c.width = im.width * scale; c.height = im.height * scale;
+        c.getContext("2d")?.drawImage(im, 0, 0, c.width, c.height);
+        resolve(c.toDataURL("image/jpeg", 0.8));
+      };
+      im.onerror = reject;
+      im.src = reader.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function Editor({ d, onSave, onClose }: { d: AdventDay; onSave: (d: AdventDay) => void; onClose: () => void }) {
+  const [draft, setDraft] = useState<AdventDay>(d);
+  const field = "mt-1 w-full rounded-xl border-2 border-secondary/60 bg-card-foreground px-3 py-2 text-paper-foreground outline-none focus:border-accent";
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="animate-pop-in relative max-h-[90vh] w-full max-w-md overflow-auto rounded-3xl border-4 border-accent bg-paper p-6 text-paper-foreground shadow-glow-accent">
+        <button onClick={onClose} className="absolute right-4 top-3 text-2xl text-primary" aria-label="Cerrar">×</button>
+        <h2 className="font-display text-2xl font-extrabold">Editar día {d.day}</h2>
+        <div className="mt-4 grid grid-cols-4 gap-2">
+          {(Object.keys(KIND) as DayKind[]).map((k) => (
+            <button key={k} onClick={() => setDraft({ ...draft, kind: k })} className={`rounded-xl border-2 p-2 text-center text-sm transition ${draft.kind === k ? "border-primary bg-magic scale-105" : "border-secondary/40"}`}>
+              <div className="text-2xl">{KIND[k].icon}</div>{KIND[k].label}
+            </button>
+          ))}
+        </div>
+        <label className="mt-4 block text-sm font-bold">Título
+          <input className={field} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+        </label>
+        <label className="mt-3 block text-sm font-bold">Mensaje
+          <textarea rows={5} className={field} value={draft.text} onChange={(e) => setDraft({ ...draft, text: e.target.value })} />
+        </label>
+        <label className="mt-3 block text-sm font-bold">Foto {draft.kind !== "foto" && <span className="font-normal opacity-70">(se muestra en días tipo Foto)</span>}
+          <input type="file" accept="image/*" className={field} onChange={async (e) => { const f = e.target.files?.[0]; if (f) setDraft({ ...draft, image: await resizeImage(f) }); }} />
+        </label>
+        {draft.image && <img src={draft.image} alt="Vista previa" className="mt-3 max-h-40 rounded-xl object-cover" />}
+        <div className="mt-5 flex gap-2">
+          <button onClick={() => onSave(draft)} className="flex-1 rounded-full bg-primary px-4 py-2 font-bold text-primary-foreground hover:scale-[1.02]">Guardar</button>
+          <button onClick={onClose} className="rounded-full border-2 border-primary px-4 py-2 font-bold text-primary">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function unlockedDay(preview: boolean) {
   if (preview) return 24;
@@ -131,13 +186,24 @@ function Index() {
   const [opened, setOpened] = useState<number[]>([]);
   const [active, setActive] = useState<AdventDay | null>(null);
   const [preview, setPreview] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editDay, setEditDay] = useState<AdventDay | null>(null);
+  const [custom, setCustom] = useState<Record<number, AdventDay>>({});
+  const days = DAYS.map((d) => custom[d.day] ?? d);
 
   useEffect(() => {
     setPreview(new URLSearchParams(window.location.search).has("preview"));
     try { setOpened(JSON.parse(localStorage.getItem(STORAGE) || "[]")); } catch { /* vacío */ }
+    try { setCustom(JSON.parse(localStorage.getItem(CONTENT) || "{}")); } catch { /* vacío */ }
   }, []);
 
-  const max = unlockedDay(preview);
+  const max = unlockedDay(preview || editing);
+  const save = (d: AdventDay) => {
+    const next = { ...custom, [d.day]: d };
+    try { localStorage.setItem(CONTENT, JSON.stringify(next)); } catch { alert("No hay espacio para más fotos. Prueba con una imagen más pequeña."); return; }
+    setCustom(next);
+    setEditDay(null);
+  };
   const open = (d: AdventDay) => {
     const next = opened.includes(d.day) ? opened : [...opened, d.day];
     setOpened(next);
@@ -169,14 +235,24 @@ function Index() {
       </header>
 
       <section className="relative mx-auto mt-10 grid max-w-4xl grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 md:gap-4">
-        {DAYS.map((d, i) => (
-          <Door key={d.day} d={d} index={i} locked={d.day > max} opened={opened.includes(d.day)} onOpen={() => open(d)} />
+        {days.map((d, i) => (
+          <Door key={d.day} d={d} index={i} locked={d.day > max} opened={!editing && opened.includes(d.day)} onOpen={() => (editing ? setEditDay(d) : open(d))} />
         ))}
       </section>
 
       {max === 0 && (
         <p className="relative mt-8 text-center font-hand text-2xl text-accent">Las puertitas se abren a partir del 1 de diciembre ✨</p>
       )}
+      <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2">
+        {editing && (
+          <button onClick={() => { setOpened([]); localStorage.removeItem(STORAGE); }} className="rounded-full border-2 border-secondary bg-muted px-4 py-2 text-sm font-bold">↺ Cerrar todas las puertas</button>
+        )}
+        <button onClick={() => setEditing(!editing)} className={`rounded-full px-5 py-3 font-bold shadow-glow-accent transition hover:scale-105 ${editing ? "bg-magic text-accent-foreground" : "bg-primary text-primary-foreground"}`}>
+          {editing ? "✓ Terminar edición" : "✏️ Editar casillas"}
+        </button>
+      </div>
+      {editing && <p className="relative mt-6 text-center font-hand text-2xl text-secondary">Modo edición: toca cualquier casilla para cambiarla</p>}
+      {editDay && <Editor key={editDay.day} d={editDay} onSave={save} onClose={() => setEditDay(null)} />}
       {active && <Modal d={active} onClose={() => setActive(null)} />}
     </main>
   );
