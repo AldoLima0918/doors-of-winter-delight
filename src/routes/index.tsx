@@ -1,12 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { DAYS, type AdventDay, type DayKind } from "@/data/days";
+import { useEffect, useState } from "react";
+import { DAYS, type AdventDay } from "@/data/days";
+import { Door } from "@/components/advent/Door";
+import { DayModal, SpecialLetter } from "@/components/advent/DayModal";
+import { Lights, Snow } from "@/components/advent/decor";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Calendario de Adviento para Mi Amor" },
-      { name: "description", content: "24 días de sorpresas navideñas: fotos, cartas, vales y recuerdos para mi amor." },
+      {
+        name: "description",
+        content:
+          "24 días de sorpresas navideñas: fotos, cartas, vales, recuerdos y juegos para mi amor.",
+      },
       { property: "og:title", content: "Calendario de Adviento para Mi Amor" },
       { property: "og:description", content: "24 días de sorpresas navideñas hechas con amor." },
       { property: "og:type", content: "website" },
@@ -16,225 +23,135 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const KIND: Record<DayKind, { icon: string; label: string }> = {
-  foto: { icon: "📸", label: "Foto" },
-  carta: { icon: "💌", label: "Carta" },
-  vale: { icon: "🎟️", label: "Vale" },
-  recuerdo: { icon: "✨", label: "Recuerdo" },
-  especial: { icon: "💝", label: "Carta especial" },
-};
-
-const SIZE: Record<string, string> = {
-  normal: "",
-  ancha: "col-span-2",
-  alta: "row-span-2",
-  grande: "col-span-2 row-span-2",
-};
-
 const STORAGE = "advent-opened";
-function unlockedDay(preview: boolean) {
-  if (preview) return 24;
-  const now = new Date();
-  if (now.getMonth() !== 11) return now.getMonth() > 11 ? 24 : 0;
-  return now.getDate();
-}
 
-function Snow() {
-  const flakes = useMemo(
-    () => Array.from({ length: 45 }, (_, i) => ({ i, left: Math.random() * 100, size: 4 + Math.random() * 8, dur: 8 + Math.random() * 12, delay: -Math.random() * 20, op: 0.4 + Math.random() * 0.6 })),
-    [],
-  );
-  return (
-    <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
-      {flakes.map((f) => (
-        <span key={f.i} className="animate-snow absolute top-0 rounded-full bg-paper" style={{ left: `${f.left}%`, width: f.size, height: f.size, opacity: f.op, animationDuration: `${f.dur}s`, animationDelay: `${f.delay}s` }} />
-      ))}
-    </div>
-  );
-}
-
-function Burst() {
-  const parts = Array.from({ length: 16 }, (_, i) => {
-    const a = (i / 16) * Math.PI * 2;
-    return { i, dx: Math.cos(a) * 90, dy: Math.sin(a) * 90, c: i % 3 === 0 ? "bg-secondary" : i % 3 === 1 ? "bg-accent" : "bg-gold" };
+function useToday() {
+  const [t, setT] = useState<{ day: number | null; untilXmas: number | null }>({
+    day: null,
+    untilXmas: null,
   });
-  return (
-    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-      {parts.map((p) => (
-        <span key={p.i} className={`animate-burst absolute h-2.5 w-2.5 rounded-full ${p.c}`} style={{ ["--dx" as string]: `${p.dx}px`, ["--dy" as string]: `${p.dy}px` }} />
-      ))}
-    </div>
-  );
-}
-
-function Door({ d, locked, opened, onOpen, index }: { d: AdventDay; locked: boolean; opened: boolean; onOpen: () => void; index: number }) {
-  const [shake, setShake] = useState(false);
-  const [burst, setBurst] = useState(false);
-  const big = d.day === 24;
-  return (
-    <button
-      onClick={() => {
-        if (locked) { setShake(true); setTimeout(() => setShake(false), 400); return; }
-        setBurst(true); setTimeout(() => setBurst(false), 900);
-        setTimeout(onOpen, opened ? 0 : 650);
-      }}
-      className={`animate-fade-up group relative h-full w-full [perspective:900px] ${big ? "col-span-3 row-span-3" : SIZE[d.size ?? "normal"]} ${shake ? "animate-shake" : ""}`}
-      style={{ animationDelay: `${index * 40}ms` }}
-      aria-label={`Día ${d.day}${locked ? " (bloqueado)" : ""}`}
-    >
-      {/* interior */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl border-2 border-secondary/60 bg-paper text-paper-foreground shadow-glow">
-        <span className={big ? "text-7xl" : "text-4xl"}>{KIND[d.kind].icon}</span>
-        <span className="font-hand text-xl">{KIND[d.kind].label}</span>
-      </div>
-      {/* puerta */}
-      <div
-        className={`absolute inset-0 origin-left rounded-2xl border-2 bg-door transition-transform duration-700 [backface-visibility:hidden] [transform-style:preserve-3d] ${opened || burst ? "[transform:rotateY(-110deg)]" : "group-hover:[transform:rotateY(-14deg)]"} ${locked ? "border-border" : "border-secondary shadow-glow"}`}
-      >
-        <div className="absolute inset-2 rounded-xl border border-dashed border-gold/50" />
-        <span className={`absolute inset-0 flex items-center justify-center font-display font-extrabold ${big ? "text-7xl md:text-8xl" : "text-3xl md:text-4xl"} ${locked ? "text-foreground/60" : "text-magic"}`}>{d.day}</span>
-        <span className="absolute right-3 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-gold" />
-        {locked && <span className="absolute bottom-2 right-2 text-sm opacity-70">🔒</span>}
-        {big && (
-          <>
-            <span className="absolute left-0 right-0 top-6 text-center font-hand text-3xl text-accent md:text-4xl">Nochebuena</span>
-            <span className="absolute bottom-6 left-0 right-0 text-center text-sm uppercase tracking-[0.3em] text-secondary">Carta especial</span>
-            <span className="animate-floaty absolute left-6 top-1/2 text-3xl">🎄</span>
-            <span className="animate-floaty absolute right-8 top-1/3 text-2xl" style={{ animationDelay: "1s" }}>💝</span>
-          </>
-        )}
-      </div>
-      {burst && <Burst />}
-    </button>
-  );
-}
-
-function Modal({ d, onClose }: { d: AdventDay; onClose: () => void }) {
   useEffect(() => {
-    const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", k);
-    return () => window.removeEventListener("keydown", k);
-  }, [onClose]);
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="animate-pop-in relative max-h-[90vh] w-full max-w-md overflow-auto rounded-3xl border-4 border-secondary bg-paper p-6 text-paper-foreground shadow-glow-accent">
-        <button onClick={onClose} className="absolute right-4 top-3 text-2xl text-primary hover:scale-110" aria-label="Cerrar">×</button>
-        <p className="font-hand text-2xl text-primary">Día {d.day} · {KIND[d.kind].icon} {KIND[d.kind].label}</p>
-        <h2 className="mt-1 font-display text-3xl font-extrabold">{d.title}</h2>
-        {d.kind === "foto" && d.image && (
-          <div className="mx-auto mt-5 w-fit rotate-[-2deg] bg-card-foreground p-3 pb-10 shadow-xl">
-            <img src={d.image} alt={d.title} className="max-h-72 w-full object-cover" />
-          </div>
-        )}
-        {d.kind === "vale" ? (
-          <div className="mt-5 rounded-2xl border-2 border-dashed border-primary bg-magic p-5 text-center text-accent-foreground">
-            <p className="text-xs font-bold uppercase tracking-[0.3em]">Vale canjeable</p>
-            <p className="mt-2 font-hand text-2xl">{d.text}</p>
-            <p className="mt-3 text-xs">Válido para siempre · Firmado con amor ❤</p>
-          </div>
-        ) : (
-          <p className={`mt-5 leading-relaxed ${d.kind === "carta" ? "font-hand text-2xl" : "text-lg"}`}>{d.text}</p>
-        )}
-        <p className="mt-6 text-right font-hand text-xl text-primary">— con amor, para mi amor 💕</p>
-      </div>
-    </div>
-  );
-}
-
-function SpecialLetter({ d, onClose }: { d: AdventDay; onClose: () => void }) {
-  const [open, setOpen] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setOpen(true), 700);
-    const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", k);
-    return () => { clearTimeout(t); window.removeEventListener("keydown", k); };
-  }, [onClose]);
-  const hearts = useMemo(() => Array.from({ length: 18 }, (_, i) => ({ i, left: Math.random() * 100, dur: 6 + Math.random() * 6, delay: -Math.random() * 10, size: 14 + Math.random() * 20 })), []);
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-background/90 p-4 backdrop-blur-md" onClick={onClose}>
-      <div className="pointer-events-none absolute inset-0" aria-hidden>
-        {hearts.map((h) => (
-          <span key={h.i} className="animate-rise absolute bottom-0" style={{ left: `${h.left}%`, fontSize: h.size, animationDuration: `${h.dur}s`, animationDelay: `${h.delay}s` }}>
-            {h.i % 3 === 0 ? "💙" : h.i % 3 === 1 ? "💜" : "❤️"}
-          </span>
-        ))}
-      </div>
-      <div onClick={(e) => e.stopPropagation()} className="relative w-full max-w-lg">
-        {!open ? (
-          <div className="animate-pop-in mx-auto flex aspect-[3/2] w-full max-w-sm items-center justify-center rounded-2xl border-4 border-secondary bg-door shadow-glow">
-            <span className="animate-floaty text-7xl">💌</span>
-          </div>
-        ) : (
-          <div className="animate-letter relative max-h-[88vh] overflow-auto rounded-3xl border-4 border-secondary bg-paper p-8 text-paper-foreground shadow-glow-accent">
-            <button onClick={onClose} className="absolute right-5 top-3 text-2xl text-primary" aria-label="Cerrar">×</button>
-            <div className="h-1.5 w-full rounded-full bg-magic" />
-            <p className="mt-5 text-center font-hand text-2xl text-primary">24 de diciembre</p>
-            <h2 className="text-center font-display text-4xl font-extrabold italic">{d.title}</h2>
-            <div className="mt-6 space-y-4">
-              {d.text.split("\n\n").map((para, i) => (
-                <p key={i} className="animate-fade-up font-hand text-2xl leading-snug" style={{ animationDelay: `${0.4 + i * 0.35}s` }}>{para}</p>
-              ))}
-            </div>
-            <p className="mt-8 text-right font-hand text-3xl text-primary">Para siempre tuyo ❤</p>
-            <div className="mt-5 h-1.5 w-full rounded-full bg-magic" />
-          </div>
-        )}
-      </div>
-    </div>
-  );
+    const now = new Date();
+    const day = now.getMonth() === 11 && now.getDate() <= 24 ? now.getDate() : null;
+    const xmas = new Date(now.getFullYear(), 11, 25);
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diff = Math.round((xmas.getTime() - start.getTime()) / 86_400_000);
+    setT({ day, untilXmas: diff });
+  }, []);
+  return t;
 }
 
 function Index() {
   const [opened, setOpened] = useState<number[]>([]);
   const [active, setActive] = useState<AdventDay | null>(null);
-  const [preview, setPreview] = useState(false);
+  const { day: today, untilXmas } = useToday();
 
   useEffect(() => {
-    setPreview(new URLSearchParams(window.location.search).has("preview"));
-    try { setOpened(JSON.parse(localStorage.getItem(STORAGE) || "[]")); } catch { /* vacío */ }
+    try {
+      setOpened(JSON.parse(localStorage.getItem(STORAGE) || "[]"));
+    } catch {
+      /* vacío */
+    }
   }, []);
 
-  const max = unlockedDay(preview);
   const open = (d: AdventDay) => {
-    const next = opened.includes(d.day) ? opened : [...opened, d.day];
-    setOpened(next);
-    localStorage.setItem(STORAGE, JSON.stringify(next));
+    setOpened((prev) => {
+      if (prev.includes(d.day)) return prev;
+      const next = [...prev, d.day];
+      try {
+        localStorage.setItem(STORAGE, JSON.stringify(next));
+      } catch {
+        /* sin almacenamiento */
+      }
+      return next;
+    });
     setActive(d);
   };
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-night px-4 pb-16 pt-10">
+    <main className="bg-night relative min-h-screen overflow-hidden px-4 pb-16 pt-16 md:pt-20">
+      <Lights />
       <Snow />
-      <header className="relative mx-auto max-w-3xl text-center">
-        <div className="flex justify-center gap-6 text-2xl">
-          {["⭐", "❄️", "⭐"].map((s, i) => <span key={i} className="animate-twinkle" style={{ animationDelay: `${i * 0.6}s` }}>{s}</span>)}
-        </div>
-        <p className="mt-3 font-hand text-3xl text-secondary">Para mi amor</p>
-        <h1 className="animate-fade-up font-display text-5xl font-extrabold leading-tight md:text-7xl">
-          Calendario de <span className="italic text-magic">Adviento</span>
+
+      <header className="relative z-10 mx-auto max-w-3xl text-center">
+        <p className="animate-fade-up font-hand text-3xl text-gold md:text-4xl">Para mi amor</p>
+        <h1
+          className="animate-fade-up mt-1 font-display text-5xl font-extrabold leading-[1.05] text-paper md:text-7xl"
+          style={{ animationDelay: "80ms" }}
+        >
+          Calendario de <span className="text-magic italic">Adviento</span>
         </h1>
-        <p className="mx-auto mt-4 max-w-md text-muted-foreground">
-          24 puertitas con fotos, cartas, vales y recuerdos. Abre una cada día hasta Navidad 🎄
+        <p
+          className="animate-fade-up mx-auto mt-4 max-w-md text-base text-muted-foreground"
+          style={{ animationDelay: "160ms" }}
+        >
+          24 regalitos envueltos con cariño. Abre uno cada día hasta Navidad… o todos de golpe, no
+          te juzgo 🎄
         </p>
-        <div className="mt-5 inline-flex items-center gap-3 rounded-full border border-border bg-muted/60 px-5 py-2 text-sm">
-          <span className="animate-floaty">🎁</span>
-          <span>{opened.length} de 24 sorpresas abiertas</span>
-          <span className="h-2 w-24 overflow-hidden rounded-full bg-background/50">
-            <span className="block h-full bg-magic transition-all duration-700" style={{ width: `${(opened.length / 24) * 100}%` }} />
-          </span>
+
+        <div
+          className="animate-fade-up mt-6 flex flex-wrap items-center justify-center gap-3"
+          style={{ animationDelay: "240ms" }}
+        >
+          <div className="inline-flex items-center gap-3 rounded-full border border-gold/30 bg-black/20 px-5 py-2 text-sm backdrop-blur">
+            <span>🎁</span>
+            <span>
+              <b className="text-gold">{opened.length}</b> de 24 abiertas
+            </span>
+            <span className="h-1.5 w-20 overflow-hidden rounded-full bg-white/10">
+              <span
+                className="bg-magic block h-full transition-[width] duration-700 ease-out"
+                style={{ width: `${(opened.length / 24) * 100}%` }}
+              />
+            </span>
+          </div>
+          {untilXmas !== null && (
+            <div className="inline-flex items-center gap-2 rounded-full border border-gold/30 bg-black/20 px-5 py-2 text-sm backdrop-blur">
+              <span>🎄</span>
+              {untilXmas > 1 ? (
+                <span>
+                  Faltan <b className="text-gold">{untilXmas}</b> días para Navidad
+                </span>
+              ) : untilXmas === 1 ? (
+                <span>¡Mañana es Navidad!</span>
+              ) : (
+                <span>¡Feliz Navidad!</span>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
-      <section className="relative mx-auto mt-10 grid max-w-5xl auto-rows-[96px] grid-cols-3 gap-3 [grid-auto-flow:dense] sm:auto-rows-[120px] md:grid-cols-6 md:gap-4">
+      <section className="relative z-10 mx-auto mt-12 grid max-w-5xl auto-rows-[104px] grid-cols-3 gap-3 [grid-auto-flow:dense] sm:auto-rows-[124px] md:grid-cols-6 md:gap-4">
         {DAYS.map((d, i) => (
-          <Door key={d.day} d={d} index={i} locked={d.day > max} opened={opened.includes(d.day)} onOpen={() => open(d)} />
+          <Door
+            key={d.day}
+            d={d}
+            index={i}
+            isToday={today === d.day}
+            opened={opened.includes(d.day)}
+            onOpen={() => open(d)}
+          />
         ))}
       </section>
 
-      {max === 0 && (
-        <p className="relative mt-8 text-center font-hand text-2xl text-accent">Las puertitas se abren a partir del 1 de diciembre ✨</p>
-      )}
-      {active && (active.kind === "especial" ? <SpecialLetter d={active} onClose={() => setActive(null)} /> : <Modal d={active} onClose={() => setActive(null)} />)}
+      <footer className="relative z-10 mx-auto mt-12 max-w-3xl text-center">
+        <p className="font-hand text-2xl text-gold/80">Hecho a mano, con todo mi amor ❤</p>
+      </footer>
+
+      {active &&
+        (active.kind === "especial" ? (
+          <SpecialLetter d={active} onClose={() => setActive(null)} />
+        ) : (
+          <DayModal
+            d={active}
+            onClose={() => setActive(null)}
+            onNav={(n) => {
+              const next = DAYS[n - 1];
+              if (next) open(next);
+            }}
+          />
+        ))}
     </main>
   );
 }
