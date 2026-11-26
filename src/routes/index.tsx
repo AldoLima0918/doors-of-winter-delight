@@ -21,65 +21,17 @@ const KIND: Record<DayKind, { icon: string; label: string }> = {
   carta: { icon: "💌", label: "Carta" },
   vale: { icon: "🎟️", label: "Vale" },
   recuerdo: { icon: "✨", label: "Recuerdo" },
+  especial: { icon: "💝", label: "Carta especial" },
+};
+
+const SIZE: Record<string, string> = {
+  normal: "",
+  ancha: "col-span-2",
+  alta: "row-span-2",
+  grande: "col-span-2 row-span-2",
 };
 
 const STORAGE = "advent-opened";
-const CONTENT = "advent-content";
-
-function resizeImage(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const im = new Image();
-      im.onload = () => {
-        const scale = Math.min(1, 900 / Math.max(im.width, im.height));
-        const c = document.createElement("canvas");
-        c.width = im.width * scale; c.height = im.height * scale;
-        c.getContext("2d")?.drawImage(im, 0, 0, c.width, c.height);
-        resolve(c.toDataURL("image/jpeg", 0.8));
-      };
-      im.onerror = reject;
-      im.src = reader.result as string;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-function Editor({ d, onSave, onClose }: { d: AdventDay; onSave: (d: AdventDay) => void; onClose: () => void }) {
-  const [draft, setDraft] = useState<AdventDay>(d);
-  const field = "mt-1 w-full rounded-xl border-2 border-secondary/60 bg-card-foreground px-3 py-2 text-paper-foreground outline-none focus:border-accent";
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="animate-pop-in relative max-h-[90vh] w-full max-w-md overflow-auto rounded-3xl border-4 border-accent bg-paper p-6 text-paper-foreground shadow-glow-accent">
-        <button onClick={onClose} className="absolute right-4 top-3 text-2xl text-primary" aria-label="Cerrar">×</button>
-        <h2 className="font-display text-2xl font-extrabold">Editar día {d.day}</h2>
-        <div className="mt-4 grid grid-cols-4 gap-2">
-          {(Object.keys(KIND) as DayKind[]).map((k) => (
-            <button key={k} onClick={() => setDraft({ ...draft, kind: k })} className={`rounded-xl border-2 p-2 text-center text-sm transition ${draft.kind === k ? "border-primary bg-magic scale-105" : "border-secondary/40"}`}>
-              <div className="text-2xl">{KIND[k].icon}</div>{KIND[k].label}
-            </button>
-          ))}
-        </div>
-        <label className="mt-4 block text-sm font-bold">Título
-          <input className={field} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
-        </label>
-        <label className="mt-3 block text-sm font-bold">Mensaje
-          <textarea rows={5} className={field} value={draft.text} onChange={(e) => setDraft({ ...draft, text: e.target.value })} />
-        </label>
-        <label className="mt-3 block text-sm font-bold">Foto {draft.kind !== "foto" && <span className="font-normal opacity-70">(se muestra en días tipo Foto)</span>}
-          <input type="file" accept="image/*" className={field} onChange={async (e) => { const f = e.target.files?.[0]; if (f) setDraft({ ...draft, image: await resizeImage(f) }); }} />
-        </label>
-        {draft.image && <img src={draft.image} alt="Vista previa" className="mt-3 max-h-40 rounded-xl object-cover" />}
-        <div className="mt-5 flex gap-2">
-          <button onClick={() => onSave(draft)} className="flex-1 rounded-full bg-primary px-4 py-2 font-bold text-primary-foreground hover:scale-[1.02]">Guardar</button>
-          <button onClick={onClose} className="rounded-full border-2 border-primary px-4 py-2 font-bold text-primary">Cancelar</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function unlockedDay(preview: boolean) {
   if (preview) return 24;
   const now = new Date();
@@ -126,13 +78,13 @@ function Door({ d, locked, opened, onOpen, index }: { d: AdventDay; locked: bool
         setBurst(true); setTimeout(() => setBurst(false), 900);
         setTimeout(onOpen, opened ? 0 : 650);
       }}
-      className={`animate-fade-up group relative aspect-square [perspective:900px] ${big ? "col-span-2 row-span-2 aspect-auto" : ""} ${shake ? "animate-shake" : ""}`}
+      className={`animate-fade-up group relative h-full w-full [perspective:900px] ${big ? "col-span-3 row-span-3" : SIZE[d.size ?? "normal"]} ${shake ? "animate-shake" : ""}`}
       style={{ animationDelay: `${index * 40}ms` }}
       aria-label={`Día ${d.day}${locked ? " (bloqueado)" : ""}`}
     >
       {/* interior */}
       <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl border-2 border-secondary/60 bg-paper text-paper-foreground shadow-glow">
-        <span className="text-4xl">{KIND[d.kind].icon}</span>
+        <span className={big ? "text-7xl" : "text-4xl"}>{KIND[d.kind].icon}</span>
         <span className="font-hand text-xl">{KIND[d.kind].label}</span>
       </div>
       {/* puerta */}
@@ -143,7 +95,14 @@ function Door({ d, locked, opened, onOpen, index }: { d: AdventDay; locked: bool
         <span className={`absolute inset-0 flex items-center justify-center font-display font-extrabold ${big ? "text-7xl md:text-8xl" : "text-3xl md:text-4xl"} ${locked ? "text-foreground/60" : "text-magic"}`}>{d.day}</span>
         <span className="absolute right-3 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-gold" />
         {locked && <span className="absolute bottom-2 right-2 text-sm opacity-70">🔒</span>}
-        {big && <span className="absolute left-0 right-0 top-4 text-center font-hand text-2xl text-accent">Nochebuena</span>}
+        {big && (
+          <>
+            <span className="absolute left-0 right-0 top-6 text-center font-hand text-3xl text-accent md:text-4xl">Nochebuena</span>
+            <span className="absolute bottom-6 left-0 right-0 text-center text-sm uppercase tracking-[0.3em] text-secondary">Carta especial</span>
+            <span className="animate-floaty absolute left-6 top-1/2 text-3xl">🎄</span>
+            <span className="animate-floaty absolute right-8 top-1/3 text-2xl" style={{ animationDelay: "1s" }}>💝</span>
+          </>
+        )}
       </div>
       {burst && <Burst />}
     </button>
@@ -182,28 +141,60 @@ function Modal({ d, onClose }: { d: AdventDay; onClose: () => void }) {
   );
 }
 
+function SpecialLetter({ d, onClose }: { d: AdventDay; onClose: () => void }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setOpen(true), 700);
+    const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", k);
+    return () => { clearTimeout(t); window.removeEventListener("keydown", k); };
+  }, [onClose]);
+  const hearts = useMemo(() => Array.from({ length: 18 }, (_, i) => ({ i, left: Math.random() * 100, dur: 6 + Math.random() * 6, delay: -Math.random() * 10, size: 14 + Math.random() * 20 })), []);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-background/90 p-4 backdrop-blur-md" onClick={onClose}>
+      <div className="pointer-events-none absolute inset-0" aria-hidden>
+        {hearts.map((h) => (
+          <span key={h.i} className="animate-rise absolute bottom-0" style={{ left: `${h.left}%`, fontSize: h.size, animationDuration: `${h.dur}s`, animationDelay: `${h.delay}s` }}>
+            {h.i % 3 === 0 ? "💙" : h.i % 3 === 1 ? "💜" : "❤️"}
+          </span>
+        ))}
+      </div>
+      <div onClick={(e) => e.stopPropagation()} className="relative w-full max-w-lg">
+        {!open ? (
+          <div className="animate-pop-in mx-auto flex aspect-[3/2] w-full max-w-sm items-center justify-center rounded-2xl border-4 border-secondary bg-door shadow-glow">
+            <span className="animate-floaty text-7xl">💌</span>
+          </div>
+        ) : (
+          <div className="animate-letter relative max-h-[88vh] overflow-auto rounded-3xl border-4 border-secondary bg-paper p-8 text-paper-foreground shadow-glow-accent">
+            <button onClick={onClose} className="absolute right-5 top-3 text-2xl text-primary" aria-label="Cerrar">×</button>
+            <div className="h-1.5 w-full rounded-full bg-magic" />
+            <p className="mt-5 text-center font-hand text-2xl text-primary">24 de diciembre</p>
+            <h2 className="text-center font-display text-4xl font-extrabold italic">{d.title}</h2>
+            <div className="mt-6 space-y-4">
+              {d.text.split("\n\n").map((para, i) => (
+                <p key={i} className="animate-fade-up font-hand text-2xl leading-snug" style={{ animationDelay: `${0.4 + i * 0.35}s` }}>{para}</p>
+              ))}
+            </div>
+            <p className="mt-8 text-right font-hand text-3xl text-primary">Para siempre tuyo ❤</p>
+            <div className="mt-5 h-1.5 w-full rounded-full bg-magic" />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Index() {
   const [opened, setOpened] = useState<number[]>([]);
   const [active, setActive] = useState<AdventDay | null>(null);
   const [preview, setPreview] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [editDay, setEditDay] = useState<AdventDay | null>(null);
-  const [custom, setCustom] = useState<Record<number, AdventDay>>({});
-  const days = DAYS.map((d) => custom[d.day] ?? d);
 
   useEffect(() => {
     setPreview(new URLSearchParams(window.location.search).has("preview"));
     try { setOpened(JSON.parse(localStorage.getItem(STORAGE) || "[]")); } catch { /* vacío */ }
-    try { setCustom(JSON.parse(localStorage.getItem(CONTENT) || "{}")); } catch { /* vacío */ }
   }, []);
 
-  const max = unlockedDay(preview || editing);
-  const save = (d: AdventDay) => {
-    const next = { ...custom, [d.day]: d };
-    try { localStorage.setItem(CONTENT, JSON.stringify(next)); } catch { alert("No hay espacio para más fotos. Prueba con una imagen más pequeña."); return; }
-    setCustom(next);
-    setEditDay(null);
-  };
+  const max = unlockedDay(preview);
   const open = (d: AdventDay) => {
     const next = opened.includes(d.day) ? opened : [...opened, d.day];
     setOpened(next);
@@ -234,26 +225,16 @@ function Index() {
         </div>
       </header>
 
-      <section className="relative mx-auto mt-10 grid max-w-4xl grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 md:gap-4">
-        {days.map((d, i) => (
-          <Door key={d.day} d={d} index={i} locked={d.day > max} opened={!editing && opened.includes(d.day)} onOpen={() => (editing ? setEditDay(d) : open(d))} />
+      <section className="relative mx-auto mt-10 grid max-w-5xl auto-rows-[96px] grid-cols-3 gap-3 [grid-auto-flow:dense] sm:auto-rows-[120px] md:grid-cols-6 md:gap-4">
+        {DAYS.map((d, i) => (
+          <Door key={d.day} d={d} index={i} locked={d.day > max} opened={opened.includes(d.day)} onOpen={() => open(d)} />
         ))}
       </section>
 
       {max === 0 && (
         <p className="relative mt-8 text-center font-hand text-2xl text-accent">Las puertitas se abren a partir del 1 de diciembre ✨</p>
       )}
-      <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2">
-        {editing && (
-          <button onClick={() => { setOpened([]); localStorage.removeItem(STORAGE); }} className="rounded-full border-2 border-secondary bg-muted px-4 py-2 text-sm font-bold">↺ Cerrar todas las puertas</button>
-        )}
-        <button onClick={() => setEditing(!editing)} className={`rounded-full px-5 py-3 font-bold shadow-glow-accent transition hover:scale-105 ${editing ? "bg-magic text-accent-foreground" : "bg-primary text-primary-foreground"}`}>
-          {editing ? "✓ Terminar edición" : "✏️ Editar casillas"}
-        </button>
-      </div>
-      {editing && <p className="relative mt-6 text-center font-hand text-2xl text-secondary">Modo edición: toca cualquier casilla para cambiarla</p>}
-      {editDay && <Editor key={editDay.day} d={editDay} onSave={save} onClose={() => setEditDay(null)} />}
-      {active && <Modal d={active} onClose={() => setActive(null)} />}
+      {active && (active.kind === "especial" ? <SpecialLetter d={active} onClose={() => setActive(null)} /> : <Modal d={active} onClose={() => setActive(null)} />)}
     </main>
   );
 }
