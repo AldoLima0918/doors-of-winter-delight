@@ -1,0 +1,10 @@
+# Despliegue en Netlify.
+# Este archivo tiene prioridad sobre lo configurado en la web de Netlify.
+[build]
+  command = "bun run build"
+  # Con el preset "netlify", Nitro deja la web en `dist/`
+  # y el servidor en `.netlify/functions-internal/` (Netlify lo detecta solo).
+  publish = "dist"
+
+[build.environment]
+  NITRO_PRESET = "netlify"
